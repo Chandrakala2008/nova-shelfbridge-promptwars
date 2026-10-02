@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NOVA ShelfBridge — Zero-Friction Inventory Sync & Smart-Substitution</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            nova: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#082f49',
+            },
+            kirana: {
+              50: '#fffbeb',
+              100: '#fef3c7',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar and accessibility focus */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .pulse-mic {
+      animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- TOP HEADER -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-sky-500 to-emerald-400 flex items-center justify-center font-black text-xl text-slate-950 shadow">
+          N
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">NOVA ShelfBridge</h1>
+            <span class="text-[10px] bg-sky-900/80 text-sky-300 font-semibold px-2 py-0.5 rounded border border-sky-700/50 uppercase tracking-wider">
+              Hackathon MVP
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Zero-Friction Merchant Inventory Sync & Smart-Substitution Bridge</p>
+        </div>
+      </div>
+
+      <!-- VIEW SELECTOR BUTTONS -->
+      <div class="flex items-center bg-slate-800/90 rounded-lg p-1 border border-slate-700 text-xs font-medium">
+        <button id="tab-btn-split" onclick="switchView('split')" class="px-3 py-1.5 rounded-md bg-sky-600 text-white shadow transition-all">
+          🖥️ Split Dual-View
+        </button>
+        <button id="tab-btn-merchant" onclick="switchView('merchant')" class="px-3 py-1.5 rounded-md text-slate-300 hover:text-white transition-all">
+          🏪 Merchant View
+        </button>
+        <button id="tab-btn-customer" onclick="switchView('customer')" class="px-3 py-1.5 rounded-md text-slate-300 hover:text-white transition-all">
+          🛍️ Customer Storefront
+        </button>
+        <button id="tab-btn-impact" onclick="switchView('impact')" class="px-3 py-1.5 rounded-md text-slate-300 hover:text-white transition-all">
+          📊 Impact HUD
+        </button>
+      </div>
+
+      <!-- HEADER ACTIONS -->
+      <div class="flex items-center space-x-2">
+        <button onclick="toggleConfigModal(true)" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+          <span id="ai-mode-pill" class="text-[11px] font-mono text-emerald-400 font-semibold">AI: Local NLP</span>
+        </button>
+        <button onclick="resetDemoData()" title="Reset all store data to pristine baseline" class="text-xs bg-slate-800 hover:bg-rose-900/40 text-slate-200 border border-slate-700 hover:border-rose-600/50 px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          <span>Reset Demo</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- LIVE NOTIFICATION TOAST CONTAINER -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 flex flex-col gap-4">
+
+    <!-- SPLIT / TABBED CONTENT CONTAINER -->
+    <div id="views-wrapper" class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-start">
+
+      <!-- ======================================================== -->
+      <!-- LEFT PANE: MERCHANT QUICK-SYNC CONSOLE (COL 1 to 6)     -->
+      <!-- ======================================================== -->
+      <section id="merchant-panel" class="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden transition-all">
+        <!-- Merchant Store Header -->
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50/70 p-4 border-b border-amber-200/60 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-base">🏪</span>
+              <h2 class="font-bold text-slate-900 text-sm sm:text-base">Gupta Kirana & General Store</h2>
+              <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded border border-emerald-300">
+                ACTIVE PARTNER
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Koramangala 4th Block • Connected to NOVA CART Network (1 of 620 Stores)</p>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Merchant Sync Mode</span>
+            <span class="text-xs font-semibold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded">Voice / Fast Text</span>
+          </div>
+        </div>
+
+        <div class="p-4 space-y-4">
+          <!-- Input Area -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label for="merchant-text-input" class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <span>💬 Quick Stock Update</span>
+                <span class="font-normal text-slate-500">(Type or speak natural Hinglish/English)</span>
+              </label>
+              <span class="text-[11px] text-slate-400">Voice / Fast Text</span>
+            </div>
+
+            <p class="text-[11px] text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded px-2.5 py-1.5 leading-relaxed font-medium">
+              Hypothesis: one spoken/text update is lower effort than manual catalog editing. Pilot metric: updates per store per day.
+            </p>
+
+            <div class="relative">
+              <textarea id="merchant-text-input" rows="3" 
+                placeholder="e.g. Amul Gold doodh khatam ho gaya, Britannia white bread 2 packet bacha hai" 
+                class="w-full text-sm p-3 pr-24 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition resize-none bg-slate-50/50 focus:bg-white text-slate-800"></textarea>
+              
+              <!-- Floating Input Controls -->
+              <div class="absolute right-2 bottom-2.5 flex items-center space-x-1.5">
+                <!-- Microphone Button for Web Speech API -->
+                <button id="mic-btn" onclick="toggleVoiceInput()" title="Click to speak (Voice Recognition)" 
+                  class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 flex items-center justify-center transition shadow-sm">
+                  <svg id="mic-icon" class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z"></path></svg>
+                </button>
+                <!-- Clear Button -->
+                <button onclick="clearMerchantInput()" title="Clear input text" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-500 flex items-center justify-center transition text-xs font-bold">
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <!-- Sync Button -->
+            <button id="sync-btn" onclick="processMerchantSync()" class="w-full bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white font-semibold py-2.5 px-4 rounded-lg shadow flex items-center justify-center gap-2 text-sm transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+              <span>Sync To Customer Catalog Now</span>
+            </button>
+          </div>
+
+          <!-- Preset Demo Chips -->
+          <div class="space-y-1.5 pt-1">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">One-Click Demo Presets:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button onclick="applyPreset('Amul Gold doodh khatam ho gaya')" class="text-xs bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-300 px-2.5 py-1 rounded-md transition text-left flex items-center gap-1 font-medium">
+                <span class="text-rose-500 font-bold">★</span> "Amul Gold doodh khatam ho gaya"
+              </button>
+              <button onclick="applyPreset('Britannia white bread over, 2 packet brown bread bacha hai')" class="text-xs bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-300 px-2.5 py-1 rounded-md transition text-left">
+                "Britannia white bread over, 2 brown bread"
+              </button>
+              <button onclick="applyPreset('Amul doodh nahi hai')" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-md transition text-left flex items-center gap-1">
+                <span>⚠️</span> "Amul doodh nahi hai" (Ambiguity Test)
+              </button>
+              <button onclick="applyPreset('Aashirvaad atta restocked 10 packets')" class="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-md transition text-left">
+                <span>🟢</span> "Aashirvaad atta restocked 10"
+              </button>
+            </div>
+          </div>
+
+          <!-- DISAMBIGUATION MODAL/CARD (Appears when ambiguous=true) -->
+          <div id="disambiguation-card" class="hidden bg-amber-50 border-2 border-amber-400 rounded-lg p-3 space-y-2 animate-pulse-once">
+            <div class="flex items-center gap-2 text-amber-900 font-bold text-xs">
+              <svg class="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+              <span>Ambiguity Detected: Which specific item is out of stock?</span>
+            </div>
+            <p id="disambiguation-text" class="text-xs text-amber-800">You mentioned "Amul doodh", but this store carries multiple variants. Tap to confirm:</p>
+            <div id="disambiguation-actions" class="flex flex-wrap gap-2 pt-1">
+              <!-- Dynamically populated candidate buttons -->
+            </div>
+          </div>
+
+          <!-- AI PARSING / EXECUTION AUDIT DRAWER -->
+          <div class="border border-slate-200 rounded-lg overflow-hidden bg-slate-900 text-slate-200">
+            <div class="bg-slate-950 px-3 py-1.5 flex items-center justify-between border-b border-slate-800 text-[11px] font-mono">
+              <span class="flex items-center gap-1.5 text-slate-300">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-ping"></span>
+                <span>AI Entity Extraction Trace</span>
+              </span>
+              <span id="ai-latency-badge" class="text-slate-400">Status: Standby</span>
+            </div>
+            <div class="p-3 text-xs font-mono max-h-48 overflow-y-auto">
+              <pre id="json-trace-output" class="text-emerald-400 whitespace-pre-wrap leading-relaxed">// Waiting for merchant input...
+// Click a preset above or type "Amul Gold doodh khatam ho gaya" and press Sync.</pre>
+            </div>
+          </div>
+
+          <!-- Merchant In-Store Mini Stock List -->
+          <div class="pt-2 border-t border-slate-200">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Gupta Store Shelf Snapshot (12 Mock SKUs)</h3>
+              <span class="text-[11px] text-slate-400">Live Inventory State</span>
+            </div>
+            <div class="max-h-44 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 text-xs">
+              <div id="merchant-sku-table-body" class="divide-y divide-slate-100">
+                <!-- Dynamically populated shelf rows -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- RIGHT PANE: CUSTOMER STOREFRONT & SMART-BRIDGE (COL 7-12)-->
+      <!-- ======================================================== -->
+      <section id="customer-panel" class="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden transition-all">
+        <!-- Customer Storefront Header -->
+        <div class="bg-gradient-to-r from-sky-50 to-indigo-50/70 p-4 border-b border-sky-200/60 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-base">🛍️</span>
+              <h2 class="font-bold text-slate-900 text-sm sm:text-base">Consumer App Storefront</h2>
+              <span class="text-[10px] bg-sky-100 text-sky-800 font-bold px-1.5 py-0.5 rounded border border-sky-300">
+                LIVE CATALOG
+              </span>
+            </div>
+            <p id="current-browsing-store-label" class="text-xs text-slate-500 mt-0.5">
+              Ordering from: <strong class="text-slate-700">Gupta Kirana & General Store</strong> (Delivery: ~18 mins)
+            </p>
+          </div>
+          <div class="text-right">
+            <button onclick="toggleCartDrawer()" class="relative bg-white hover:bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-lg shadow-sm text-xs font-bold text-slate-700 flex items-center gap-1.5 transition">
+              <span>🛒 Cart</span>
+              <span id="cart-count-badge" class="bg-sky-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">0</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Storefront Controls: Search & Category Filter -->
+        <div class="p-3 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <!-- Search Box -->
+          <div class="relative flex-1 min-w-[160px]">
+            <input type="text" id="customer-search-input" oninput="filterCustomerCatalog()" 
+              placeholder="Search milk, bread, atta..." 
+              class="w-full pl-7 pr-3 py-1.5 rounded-md border border-slate-300 text-xs focus:ring-1 focus:ring-sky-500 focus:outline-none bg-white">
+            <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          </div>
+
+          <!-- Category Pills -->
+          <div class="flex items-center gap-1 overflow-x-auto pb-1 max-w-full">
+            <button onclick="setCategoryFilter('ALL')" class="cat-pill active px-2 py-1 rounded bg-slate-800 text-white font-medium text-[11px]" data-category="ALL">All</button>
+            <button onclick="setCategoryFilter('Dairy')" class="cat-pill px-2 py-1 rounded bg-slate-200 text-slate-700 font-medium text-[11px]" data-category="Dairy">Dairy</button>
+            <button onclick="setCategoryFilter('Bakery')" class="cat-pill px-2 py-1 rounded bg-slate-200 text-slate-700 font-medium text-[11px]" data-category="Bakery">Bakery</button>
+            <button onclick="setCategoryFilter('Staples')" class="cat-pill px-2 py-1 rounded bg-slate-200 text-slate-700 font-medium text-[11px]" data-category="Staples">Staples</button>
+          </div>
+        </div>
+
+        <!-- Catalog Product Grid -->
+        <div class="p-4 flex-1 overflow-y-auto max-h-[580px]">
+          <div id="customer-catalog-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Dynamically populated product cards -->
+          </div>
+        </div>
+
+        <!-- Smart Bridge Active Intercept Banner (Fixed at Bottom of Customer Panel if items are substituted) -->
+        <div id="smart-bridge-summary-bar" class="hidden p-3 bg-emerald-50 border-t border-emerald-200 text-xs flex items-center justify-between text-emerald-900">
+          <div class="flex items-center gap-2">
+            <span class="text-base">⚡</span>
+            <div>
+              <span class="font-bold">Smart Bridge Active:</span>
+              <span id="smart-bridge-summary-text" class="text-emerald-800">Substitution applied. Potential cancellation avoided in this simulation.</span>
+            </div>
+          </div>
+          <button onclick="toggleCartDrawer()" class="font-bold text-emerald-700 underline text-[11px] hover:text-emerald-900">
+            View Cart & Checkout
+          </button>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- BOTTOM SECTION: BUSINESS IMPACT & TELEMETRY PANEL        -->
+    <!-- ======================================================== -->
+    <section id="impact-panel" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 transition-all">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 mb-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-base">📊</span>
+            <h2 class="text-base font-bold text-slate-900">NOVA CART Business Impact & Telemetry</h2>
+          </div>
+          <p class="text-xs text-slate-500">Separating verified Case Facts from Demo Session Simulation metrics</p>
+        </div>
+        <div class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded border border-slate-200 font-mono">
+          Model: 38,500 Orders • ₹486 AOV • 35% Unavailability
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+        
+        <!-- SECTION 1: CHALLENGE BASELINE (FACTUAL CASE DATA) -->
+        <div class="md:col-span-6 bg-slate-50 rounded-lg p-3.5 border border-slate-200">
+          <div class="flex items-center justify-between mb-2.5">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+              <span>NOVA CART Challenge Baseline (Verified Case Facts)</span>
+            </h3>
+            <span class="text-[10px] bg-slate-200 text-slate-700 font-mono px-1.5 py-0.5 rounded">CASE TRUTH</span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-slate-700 text-xs">
+            <div class="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+              <span class="text-slate-400 text-[10px] block font-mono">Monthly Orders</span>
+              <strong class="text-sm font-bold text-slate-900">38,500</strong>
+              <span class="text-[10px] text-slate-500 block">Across 3 Indian cities</span>
+            </div>
+            <div class="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+              <span class="text-slate-400 text-[10px] block font-mono">Cancellation Rate</span>
+              <strong class="text-sm font-bold text-rose-600">11%</strong>
+              <span class="text-[10px] text-slate-500 block">4,235 orders cancelled</span>
+            </div>
+            <div class="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+              <span class="text-slate-400 text-[10px] block font-mono">Caused by Unavailability</span>
+              <strong class="text-sm font-bold text-rose-700">35%</strong>
+              <span class="text-[10px] text-slate-500 block">~1,482 orders/mo lost</span>
+            </div>
+            <div class="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+              <span class="text-slate-400 text-[10px] block font-mono">Availability Mismatch</span>
+              <strong class="text-sm font-bold text-slate-800">29%</strong>
+              <span class="text-[10px] text-slate-500 block">Of surveyed customers</span>
+            </div>
+            <div class="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+              <span class="text-slate-400 text-[10px] block font-mono">Merchant Effort Barrier</span>
+              <strong class="text-sm font-bold text-amber-700">39%</strong>
+              <span class="text-[10px] text-slate-500 block">Say maintenance too high</span>
+            </div>
+            <div class="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+              <span class="text-slate-400 text-[10px] block font-mono">Average Order Value</span>
+              <strong class="text-sm font-bold text-emerald-700">₹486</strong>
+              <span class="text-[10px] text-slate-500 block">Baseline benchmark</span>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2 italic">
+            *Verified case facts: 5,900 support tickets/mo (19% missing items, 29% refund status). Partner network: 620 local stores. Update cadence: some update only once every 1–3 days.
+          </p>
+        </div>
+
+        <!-- SECTION 2: DEMO SESSION TELEMETRY (SIMULATED DEMO DATA) -->
+        <div class="md:col-span-6 bg-emerald-50/50 rounded-lg p-3.5 border border-emerald-200">
+          <div class="flex items-center justify-between mb-2.5">
+            <h3 class="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Demo Session Telemetry</span>
+            </h3>
+            <span class="text-[10px] bg-emerald-100 text-emerald-800 font-mono font-bold px-1.5 py-0.5 rounded border border-emerald-300">
+              SIMULATED DEMO DATA
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+            <div class="bg-white p-2.5 rounded border border-emerald-200 shadow-2xs">
+              <span class="text-slate-500 text-[10px] block font-mono">Simulated potential cancellation intercepted</span>
+              <strong id="metric-intercepts" class="text-base font-extrabold text-emerald-600">0</strong>
+              <span class="text-[10px] text-emerald-700 block">In this simulation session</span>
+            </div>
+            <div class="bg-white p-2.5 rounded border border-emerald-200 shadow-2xs">
+              <span class="text-slate-500 text-[10px] block font-mono">Simulated GMV protected</span>
+              <strong id="metric-gmv" class="text-base font-extrabold text-emerald-700">₹0</strong>
+              <span class="text-[10px] text-slate-500 block">Tied to ₹486 case AOV</span>
+            </div>
+            <div class="bg-white p-2.5 rounded border border-emerald-200 shadow-2xs">
+              <span class="text-slate-500 text-[10px] block font-mono">Simulated support ticket avoided</span>
+              <strong id="metric-tickets" class="text-base font-extrabold text-sky-700">0</strong>
+              <span class="text-[10px] text-slate-500 block">Modeled missing-item ticket</span>
+            </div>
+          </div>
+
+          <!-- Session Audit Log -->
+          <div class="mt-3">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Live Simulation Event Log:</span>
+            <div id="session-audit-log" class="bg-white border border-emerald-200 rounded p-2 text-[11px] font-mono text-slate-700 max-h-24 overflow-y-auto space-y-1">
+              <div class="text-slate-400 italic">[System Initialized] Session ready. Awaiting merchant sync action...</div>
+            </div>
+          </div>
+          <p class="text-[10px] text-emerald-800 mt-2">
+            *Notice: All demo-generated numbers above are SIMULATED DEMO DATA based on the ₹486 case AOV benchmark and do not claim measured NOVA CART production outcomes.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- SECTION 3: PILOT KPIS TO VALIDATE (FIELD TRIAL TARGETS) -->
+      <div class="mt-4 pt-3 border-t border-slate-200">
+        <div class="flex flex-wrap items-center justify-between gap-1.5 mb-2.5">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs">🎯</span>
+            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Pilot KPIs to Validate (Field Trial Hypotheses)</h3>
+          </div>
+          <span class="text-[10px] bg-amber-100 text-amber-900 font-mono font-bold px-2 py-0.5 rounded border border-amber-300">
+            PILOT METRICS TO VALIDATE — NOT CURRENT RESULTS
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+          <div class="bg-slate-50 p-2.5 rounded border border-slate-200">
+            <span class="text-slate-500 text-[10px] block font-medium">Merchant updates per store/day</span>
+            <strong class="text-xs font-bold text-slate-900 block mt-0.5">Target: ≥ 2 updates / day</strong>
+            <span class="text-[10px] text-slate-500">Case reality: 1 every 1–3 days for some stores</span>
+          </div>
+          <div class="bg-slate-50 p-2.5 rounded border border-slate-200">
+            <span class="text-slate-500 text-[10px] block font-medium">Time per inventory update</span>
+            <strong class="text-xs font-bold text-slate-900 block mt-0.5">Target: &lt; 15 seconds</strong>
+            <span class="text-[10px] text-slate-500">Case reality: 39% report high manual effort</span>
+          </div>
+          <div class="bg-slate-50 p-2.5 rounded border border-slate-200">
+            <span class="text-slate-500 text-[10px] block font-medium">Substitution acceptance rate</span>
+            <strong class="text-xs font-bold text-slate-900 block mt-0.5">Target: ≥ 30% conversion</strong>
+            <span class="text-[10px] text-slate-500">Customer substitution willingness to validate</span>
+          </div>
+          <div class="bg-slate-50 p-2.5 rounded border border-slate-200">
+            <span class="text-slate-500 text-[10px] block font-medium">Availability-related cancellation rate</span>
+            <strong class="text-xs font-bold text-slate-900 block mt-0.5">Target: Down from 35%</strong>
+            <span class="text-[10px] text-slate-500">Case truth: 35% of all cancellations</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: CART & CHECKOUT SIMULATION DRAWER                 -->
+  <!-- ======================================================== -->
+  <div id="cart-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-base">🛒</span>
+          <h3 class="font-bold text-sm">Your NOVA CART Basket</h3>
+        </div>
+        <button onclick="toggleCartDrawer(false)" class="text-slate-400 hover:text-white text-sm font-bold">✕</button>
+      </div>
+
+      <div class="p-4 flex-1 overflow-y-auto space-y-3" id="cart-items-container">
+        <!-- Dynamically rendered cart items -->
+      </div>
+
+      <div class="p-4 border-t border-slate-200 bg-slate-50 space-y-3">
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-slate-600 font-medium">Subtotal</span>
+          <strong id="cart-subtotal" class="text-slate-900 font-bold">₹0</strong>
+        </div>
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span>Estimated Delivery Time</span>
+          <span class="font-medium text-emerald-700">~18 mins (Gupta Kirana)</span>
+        </div>
+        <button id="checkout-btn" onclick="simulateCheckout()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-lg shadow text-sm transition">
+          Simulate Order Checkout
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: AI & SETTINGS CONFIGURATION                      -->
+  <!-- ======================================================== -->
+  <div id="config-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+      <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+        <h3 class="font-bold text-sm flex items-center gap-2">
+          <span>⚙️</span>
+          <span>AI Engine Configuration</span>
+        </h3>
+        <button onclick="toggleConfigModal(false)" class="text-slate-400 hover:text-white text-sm font-bold">✕</button>
+      </div>
+
+      <div class="p-4 space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Execution Mode</label>
+          <div class="space-y-1.5">
+            <label class="flex items-center gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer">
+              <input type="radio" name="ai-mode" value="local" checked onchange="handleModeChange('local')">
+              <div>
+                <strong class="text-slate-900 block">Local Intelligent NLP (Default - 100% Reliable)</strong>
+                <span class="text-slate-500">Deterministic fuzzy SKU matcher & Hinglish intent parser. No API key needed.</span>
+              </div>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer">
+              <input type="radio" name="ai-mode" value="gemini" onchange="handleModeChange('gemini')">
+              <div>
+                <strong class="text-slate-900 block">Gemini 1.5 / 2.5 Flash API</strong>
+                <span class="text-slate-500">Direct LLM extraction via Google Gemini API key.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div id="gemini-key-container" class="hidden space-y-1.5 pt-2 border-t border-slate-100">
+          <label for="gemini-api-key" class="block font-bold text-slate-700">Google Gemini API Key</label>
+          <input type="password" id="gemini-api-key" placeholder="AIzaSy..." 
+            class="w-full p-2 border border-slate-300 rounded font-mono text-xs focus:ring-1 focus:ring-sky-500">
+          <p class="text-[11px] text-slate-500">Stored locally in your browser memory for testing.</p>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+          <button onclick="toggleConfigModal(false)" class="px-3 py-1.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium">Close</button>
+          <button onclick="saveConfig()" class="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-700 text-white font-medium">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APPLICATION CORE -->
+  <script>
+    // =========================================================================
+    // 1. DATA MASTER & STATE (Mock dataset of 2 stores and 12 realistic SKUs)
+    // =========================================================================
+    const INITIAL_STORES = [
+      {
+        id: "STR-001",
+        name: "Gupta Kirana & General Store",
+        address: "Koramangala 4th Block",
+        deliveryTime: "18 mins",
+        rating: 4.3
+      },
+      {
+        id: "STR-002",
+        name: "Sharma Daily Mart",
+        address: "Koramangala 5th Block (350m away)",
+        deliveryTime: "24 mins",
+        rating: 4.5
+      }
+    ];
+
+    const INITIAL_PRODUCTS = [
+      {
+        sku_id: "DAI-01",
+        name: "Amul Gold Full Cream Milk 500ml",
+        shortName: "Amul Gold Milk 500ml",
+        category: "Dairy",
+        price: 33,
+        unit: "500 ml",
+        in_stock: true,
+        qty: 12,
+        aliases: ["amul gold", "gold milk", "amul gold doodh", "gold doodh", "amul milk gold", "amul doodh red", "amul doodh", "amul milk"],
+        substitute_sku: "DAI-02", // Amul Taaza
+        nearby_available: true,
+        icon: "🥛"
+      },
+      {
+        sku_id: "DAI-02",
+        name: "Amul Taaza Toned Milk 500ml",
+        shortName: "Amul Taaza Milk 500ml",
+        category: "Dairy",
+        price: 27,
+        unit: "500 ml",
+        in_stock: true,
+        qty: 10,
+        aliases: ["amul taaza", "taaza milk", "taaza doodh", "blue amul", "amul blue", "amul doodh", "amul milk"],
+        substitute_sku: "DAI-01",
+        nearby_available: true,
+        icon: "🥛"
+      },
+      {
+        sku_id: "DAI-03",
+        name: "Mother Dairy Classic Curd 400g",
+        shortName: "Mother Dairy Dahi 400g",
+        category: "Dairy",
+        price: 35,
+        unit: "400 g",
+        in_stock: true,
+        qty: 8,
+        aliases: ["mother dairy curd", "curd", "dahi", "mother dairy dahi", "dahi packet"],
+        substitute_sku: "DAI-04",
+        nearby_available: true,
+        icon: "🥣"
+      },
+      {
+        sku_id: "DAI-04",
+        name: "Amul Masti Dahi 400g",
+        shortName: "Amul Masti Dahi 400g",
+        category: "Dairy",
+        price: 35,
+        unit: "400 g",
+        in_stock: true,
+        qty: 6,
+        aliases: ["amul masti dahi", "amul dahi", "amul curd", "dahi", "dahi packet"],
+        substitute_sku: "DAI-03",
+        nearby_available: true,
+        icon: "🥣"
+      },
+      {
+        sku_id: "BAK-01",
+        name: "Britannia Daily Fresh White Bread 400g",
+        shortName: "Britannia White Bread 400g",
+        category: "Bakery",
+        price: 45,
+        unit: "400 g",
+        in_stock: true,
+        qty: 9,
+        aliases: ["britannia white bread", "white bread", "bread", "britannia bread", "white bread packet"],
+        substitute_sku: "BAK-02",
+        nearby_available: true,
+        icon: "🍞"
+      },
+      {
+        sku_id: "BAK-02",
+        name: "Britannia Whole Wheat Brown Bread 400g",
+        shortName: "Britannia Brown Bread 400g",
+        category: "Bakery",
+        price: 55,
+        unit: "400 g",
+        in_stock: true,
+        qty: 7,
+        aliases: ["britannia brown bread", "brown bread", "wheat bread", "atta bread", "britannia bread", "bread"],
+        substitute_sku: "BAK-01",
+        nearby_available: true,
+        icon: "🍞"
+      },
+      {
+        sku_id: "BAK-03",
+        name: "Fresh Pav Buns 6-Pack",
+        shortName: "Fresh Pav Buns (6 pcs)",
+        category: "Bakery",
+        price: 30,
+        unit: "6 pcs",
+        in_stock: true,
+        qty: 5,
+        aliases: ["pav buns", "pav", "ladi pav", "buns", "bread pav"],
+        substitute_sku: "BAK-01",
+        nearby_available: false,
+        icon: "🥯"
+      },
+      {
+        sku_id: "STA-01",
+        name: "Aashirvaad Sharbati Atta 5kg",
+        shortName: "Aashirvaad Atta 5kg",
+        category: "Staples",
+        price: 285,
+        unit: "5 kg",
+        in_stock: true,
+        qty: 8,
+        aliases: ["aashirvaad atta", "aashirvaad", "atta 5kg", "sharbati atta", "flour"],
+        substitute_sku: "STA-02",
+        nearby_available: true,
+        icon: "🌾"
+      },
+      {
+        sku_id: "STA-02",
+        name: "Fortune Chakki Fresh Atta 5kg",
+        shortName: "Fortune Atta 5kg",
+        category: "Staples",
+        price: 260,
+        unit: "5 kg",
+        in_stock: true,
+        qty: 6,
+        aliases: ["fortune atta", "fortune chakki fresh atta", "fortune 5kg"],
+        substitute_sku: "STA-01",
+        nearby_available: true,
+        icon: "🌾"
+      },
+      {
+        sku_id: "STA-03",
+        name: "Tata Salt Iodized 1kg",
+        shortName: "Tata Salt 1kg",
+        category: "Staples",
+        price: 28,
+        unit: "1 kg",
+        in_stock: true,
+        qty: 20,
+        aliases: ["tata salt", "salt", "namak", "tata namak"],
+        substitute_sku: null,
+        nearby_available: true,
+        icon: "🧂"
+      },
+      {
+        sku_id: "BEV-01",
+        name: "Tata Tea Gold 500g",
+        shortName: "Tata Tea Gold 500g",
+        category: "Staples",
+        price: 310,
+        unit: "500 g",
+        in_stock: true,
+        qty: 9,
+        aliases: ["tata tea gold", "tata tea", "tea gold", "chai patti", "chai"],
+        substitute_sku: null,
+        nearby_available: true,
+        icon: "☕"
+      },
+      {
+        sku_id: "SNK-01",
+        name: "Maggi 2-Minute Masala Noodles 4-Pack",
+        shortName: "Maggi Masala Noodles 4-Pack",
+        category: "Staples",
+        price: 56,
+        unit: "4 x 70g",
+        in_stock: true,
+        qty: 15,
+        aliases: ["maggi", "maggi noodles", "maggi 4 pack", "maggi packet"],
+        substitute_sku: null,
+        nearby_available: true,
+        icon: "🍜"
+      }
+    ];
+
+    // Reactive State
+    let products = JSON.parse(JSON.stringify(INITIAL_PRODUCTS));
+    let cart = [];
+    let activeCategory = 'ALL';
+    let searchQuery = '';
+    let aiMode = localStorage.getItem('nova_ai_mode') || 'local';
+    let geminiApiKey = localStorage.getItem('nova_gemini_key') || '';
+    let speechRecognition = null;
+    let isListening = false;
+
+    // Demo Session Impact Counters
+    let sessionMetrics = {
+      intercepted: 0,
+      gmvProtected: 0,
+      ticketsAvoided: 0
+    };
+
+    // =========================================================================
+    // 2. INITIALIZATION & VIEW MANAGEMENT
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      renderMerchantTable();
+      renderCustomerCatalog();
+      updateCartBadge();
+      updateMetricDisplays();
+      setupSpeechRecognition();
+      updateModePill();
+    });
+
+    function switchView(mode) {
+      const merchantPanel = document.getElementById('merchant-panel');
+      const customerPanel = document.getElementById('customer-panel');
+      const impactPanel = document.getElementById('impact-panel');
+      const btnSplit = document.getElementById('tab-btn-split');
+      const btnMerchant = document.getElementById('tab-btn-merchant');
+      const btnCustomer = document.getElementById('tab-btn-customer');
+      const btnImpact = document.getElementById('tab-btn-impact');
+
+      // Reset active button classes
+      [btnSplit, btnMerchant, btnCustomer, btnImpact].forEach(b => {
+        b.className = "px-3 py-1.5 rounded-md text-slate-300 hover:text-white transition-all";
+      });
+
+      if (mode === 'split') {
+        btnSplit.className = "px-3 py-1.5 rounded-md bg-sky-600 text-white shadow font-medium";
+        merchantPanel.className = "lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden";
+        customerPanel.className = "lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden";
+        impactPanel.style.display = 'block';
+      } else if (mode === 'merchant') {
+        btnMerchant.className = "px-3 py-1.5 rounded-md bg-sky-600 text-white shadow font-medium";
+        merchantPanel.className = "col-span-12 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden";
+        customerPanel.className = "hidden";
+        impactPanel.style.display = 'none';
+      } else if (mode === 'customer') {
+        btnCustomer.className = "px-3 py-1.5 rounded-md bg-sky-600 text-white shadow font-medium";
+        merchantPanel.className = "hidden";
+        customerPanel.className = "col-span-12 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden";
+        impactPanel.style.display = 'none';
+      } else if (mode === 'impact') {
+        btnImpact.className = "px-3 py-1.5 rounded-md bg-sky-600 text-white shadow font-medium";
+        merchantPanel.className = "hidden";
+        customerPanel.className = "hidden";
+        impactPanel.style.display = 'block';
+      }
+    }
+
+    // =========================================================================
+    // 3. INTELLIGENT LOCAL NLP PARSER (Guaranteed Offline / Fallback Engine)
+    // =========================================================================
+    function parseWithLocalNLP(rawText) {
+      const text = rawText.toLowerCase().trim();
+      const updates = [];
+      const clauses = text.split(/[,;\n]|(?:\band\b)|(?:\baur\b)/i).map(s => s.trim()).filter(Boolean);
+
+      clauses.forEach(clause => {
+        // Detect action intent
+        let action = 'OUT_OF_STOCK'; // Default assumption for stock reports
+        let qty = null;
+
+        const isOOS = /\b(khatam|over|finished|out of stock|oos|nahi hai|zero|nil|chala gaya|empty|gone)\b/i.test(clause);
+        const isInStock = /\b(available|in stock|restocked|aaya hai|hai|mila|added)\b/i.test(clause);
+        const qtyMatch = clause.match(/(\d+)\s*(?:packet|pkt|bottle|kg|pcs|piece|packets)?/i);
+
+        if (qtyMatch && parseInt(qtyMatch[1], 10) > 0 && (/\b(bacha|left|only|bache)\b/i.test(clause) || action === 'LOW_STOCK')) {
+          qty = parseInt(qtyMatch[1], 10);
+          action = 'LOW_STOCK';
+        } else if (qtyMatch && parseInt(qtyMatch[1], 10) > 0 && /\b(restocked|aaya|added|in stock)\b/i.test(clause)) {
+          qty = parseInt(qtyMatch[1], 10);
+          action = 'IN_STOCK';
+        } else if (isInStock && !isOOS) {
+          action = 'IN_STOCK';
+        } else if (isOOS) {
+          action = 'OUT_OF_STOCK';
+        }
+
+        // Fuzzy match against product aliases
+        let bestMatch = null;
+        let highestScore = 0;
+        let candidateMatches = [];
+
+        products.forEach(p => {
+          let score = 0;
+          p.aliases.forEach(alias => {
+            if (clause.includes(alias)) {
+              score = Math.max(score, alias.length * 2);
+            } else {
+              // Word level overlap
+              const aliasWords = alias.split(' ');
+              const matchCount = aliasWords.filter(w => clause.includes(w)).length;
+              if (matchCount > 0) {
+                score = Math.max(score, matchCount * 1.5);
+              }
+            }
+          });
+
+          if (score >= 3) {
+            candidateMatches.push({ product: p, score: score });
+          }
+        });
+
+        // Ambiguity check: e.g. "Amul doodh" without specifying Gold or Taaza
+        if (candidateMatches.length > 1) {
+          candidateMatches.sort((a, b) => b.score - a.score);
+          const topScore = candidateMatches[0].score;
+          const runnersUp = candidateMatches.filter(c => c.score >= topScore * 0.85);
+
+          if (runnersUp.length > 1) {
+            // True ambiguity!
+            updates.push({
+              detected_phrase: clause,
+              sku_id: null,
+              product_name: "Ambiguous Entity",
+              action: action,
+              quantity: qty,
+              confidence: 0.65,
+              ambiguous: true,
+              candidate_skus: runnersUp.map(r => r.product.sku_id)
+            });
+            return;
+          } else {
+            bestMatch = candidateMatches[0].product;
+          }
+        } else if (candidateMatches.length === 1) {
+          bestMatch = candidateMatches[0].product;
+        }
+
+        if (bestMatch) {
+          updates.push({
+            detected_phrase: clause,
+            sku_id: bestMatch.sku_id,
+            product_name: bestMatch.name,
+            action: action,
+            quantity: qty,
+            confidence: 0.96,
+            ambiguous: false,
+            candidate_skus: []
+          });
+        }
+      });
+
+      return { updates };
+    }
+
+    // =========================================================================
+    // 4. GEMINI FLASH API CALLER (Optional Live LLM Mode)
+    // =========================================================================
+    async function parseWithGeminiAPI(rawText, apiKey) {
+      const catalogSummary = products.map(p => ({
+        sku_id: p.sku_id,
+        name: p.name,
+        aliases: p.aliases
+      }));
+
+      const systemPrompt = `You are the NOVA CART Merchant Catalog Parsing Engine.
+Parse unstructured natural language or Hinglish updates into structured JSON inventory actions.
+Match against this catalog: ${JSON.stringify(catalogSummary)}
+Rules:
+- Identify if action is OUT_OF_STOCK, IN_STOCK, or LOW_STOCK (with quantity).
+- If generic (e.g. "Amul doodh") matching multiple items, set "ambiguous": true with candidate_skus.
+- Output ONLY valid JSON following this schema:
+{"updates": [{"detected_phrase": "string", "sku_id": "string or null", "product_name": "string", "action": "OUT_OF_STOCK"|"IN_STOCK"|"LOW_STOCK", "quantity": number or null, "confidence": number, "ambiguous": boolean, "candidate_skus": ["string"]}]}`;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${systemPrompt}\n\nMerchant update: "${rawText}"` }] }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API Error (${response.status})`);
+      }
+
+      const data = await response.json();
+      const textResponse = data.candidates[0].content.parts[0].text;
+      const cleanJson = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanJson);
+    }
+
+    // =========================================================================
+    // 5. MERCHANT SYNC CONTROLLER
+    // =========================================================================
+    async function processMerchantSync() {
+      const inputEl = document.getElementById('merchant-text-input');
+      const text = inputEl.value.trim();
+      if (!text) {
+        showToast("Please enter or speak a stock update first.", "warning");
+        return;
+      }
+
+      const traceEl = document.getElementById('json-trace-output');
+      const latencyBadge = document.getElementById('ai-latency-badge');
+      const disambigCard = document.getElementById('disambiguation-card');
+      disambigCard.classList.add('hidden');
+
+      traceEl.innerText = "// Parsing merchant update via " + (aiMode === 'gemini' ? 'Gemini Flash API...' : 'Local Intelligent NLP...');
+      latencyBadge.innerText = "Parsing...";
+
+      const startTime = performance.now();
+      let parseResult = null;
+
+      try {
+        if (aiMode === 'gemini' && geminiApiKey) {
+          parseResult = await parseWithGeminiAPI(text, geminiApiKey);
+        } else {
+          parseResult = parseWithLocalNLP(text);
+        }
+      } catch (err) {
+        console.warn("Fallback to Local NLP:", err);
+        showToast("LLM API unavailable; used Local NLP fallback.", "info");
+        parseResult = parseWithLocalNLP(text);
+      }
+
+      const elapsed = Math.round(performance.now() - startTime);
+      latencyBadge.innerText = `Resolved in ${elapsed}ms (${aiMode.toUpperCase()})`;
+      traceEl.innerText = JSON.stringify(parseResult, null, 2);
+
+      if (!parseResult.updates || parseResult.updates.length === 0) {
+        showToast("No recognized products found in that sentence.", "warning");
+        return;
+      }
+
+      // Check for ambiguity
+      const ambiguousUpdate = parseResult.updates.find(u => u.ambiguous);
+      if (ambiguousUpdate) {
+        handleAmbiguity(ambiguousUpdate);
+        return;
+      }
+
+      // Apply valid updates
+      applyInventoryUpdates(parseResult.updates);
+    }
+
+    function applyInventoryUpdates(updates) {
+      let appliedCount = 0;
+      updates.forEach(u => {
+        if (!u.sku_id) return;
+        const prod = products.find(p => p.sku_id === u.sku_id);
+        if (prod) {
+          if (u.action === 'OUT_OF_STOCK') {
+            prod.in_stock = false;
+            prod.qty = 0;
+            logAuditEvent(`[Inventory Out] ${prod.name} marked OUT_OF_STOCK`);
+          } else if (u.action === 'IN_STOCK') {
+            prod.in_stock = true;
+            prod.qty = u.quantity || 10;
+            logAuditEvent(`[Inventory Restock] ${prod.name} marked IN_STOCK (${prod.qty} units)`);
+          } else if (u.action === 'LOW_STOCK') {
+            prod.in_stock = true;
+            prod.qty = u.quantity || 2;
+            logAuditEvent(`[Inventory Low] ${prod.name} updated to ${prod.qty} units`);
+          }
+          appliedCount++;
+        }
+      });
+
+      if (appliedCount > 0) {
+        renderMerchantTable();
+        renderCustomerCatalog();
+        showToast(`Successfully synced ${appliedCount} item(s) to customer catalog!`, "success");
+      }
+    }
+
+    function handleAmbiguity(update) {
+      const disambigCard = document.getElementById('disambiguation-card');
+      const actionsContainer = document.getElementById('disambiguation-actions');
+      actionsContainer.innerHTML = '';
+
+      update.candidate_skus.forEach(skuId => {
+        const prod = products.find(p => p.sku_id === skuId);
+        if (prod) {
+          const btn = document.createElement('button');
+          btn.className = "bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-sm transition";
+          btn.innerText = `Mark ${prod.shortName} OOS`;
+          btn.onclick = () => {
+            disambigCard.classList.add('hidden');
+            applyInventoryUpdates([{
+              sku_id: prod.sku_id,
+              action: 'OUT_OF_STOCK'
+            }]);
+          };
+          actionsContainer.appendChild(btn);
+        }
+      });
+
+      // Option for both
+      const bothBtn = document.createElement('button');
+      bothBtn.className = "bg-slate-700 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded text-xs shadow-sm transition";
+      bothBtn.innerText = "Mark Both Out of Stock";
+      bothBtn.onclick = () => {
+        disambigCard.classList.add('hidden');
+        applyInventoryUpdates(update.candidate_skus.map(s => ({ sku_id: s, action: 'OUT_OF_STOCK' })));
+      };
+      actionsContainer.appendChild(bothBtn);
+
+      disambigCard.classList.remove('hidden');
+      showToast("Ambiguity detected: Please confirm which variant.", "warning");
+    }
+
+    function applyPreset(text) {
+      const inputEl = document.getElementById('merchant-text-input');
+      inputEl.value = text;
+      processMerchantSync();
+    }
+
+    function clearMerchantInput() {
+      document.getElementById('merchant-text-input').value = '';
+    }
+
+    // =========================================================================
+    // 6. CUSTOMER STOREFRONT & SMART-BRIDGE LOGIC
+    // =========================================================================
+    function renderCustomerCatalog() {
+      const grid = document.getElementById('customer-catalog-grid');
+      grid.innerHTML = '';
+
+      let filtered = products.filter(p => {
+        const matchesCat = (activeCategory === 'ALL' || p.category === activeCategory);
+        const matchesSearch = (!searchQuery || 
+          p.name.toLowerCase().includes(searchQuery) || 
+          p.category.toLowerCase().includes(searchQuery) ||
+          p.aliases.some(a => a.includes(searchQuery)));
+        return matchesCat && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `<div class="col-span-2 text-center py-8 text-slate-400 text-xs">No products match your search.</div>`;
+        return;
+      }
+
+      filtered.forEach(p => {
+        const card = document.createElement('div');
+        const isOOS = !p.in_stock;
+
+        card.className = `p-3 rounded-lg border transition-all ${
+          isOOS ? 'bg-slate-50 border-slate-300 opacity-95' : 'bg-white border-slate-200 hover:border-sky-300 shadow-2xs'
+        }`;
+
+        // Header + Status Badge
+        let statusBadge = isOOS 
+          ? `<span class="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-0.5 rounded border border-rose-300">OUT OF STOCK</span>`
+          : `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-300">IN STOCK (${p.qty})</span>`;
+
+        // Smart Bridge Card (if OOS)
+        let smartBridgeHtml = '';
+        if (isOOS) {
+          const substituteProduct = products.find(sub => sub.sku_id === p.substitute_sku);
+
+          smartBridgeHtml = `
+            <div class="mt-2.5 pt-2.5 border-t border-slate-200 bg-sky-50/70 p-2.5 rounded-lg border border-sky-200">
+              <div class="flex items-center justify-between text-sky-900 font-bold text-[11px] mb-1.5">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs">⚡</span>
+                  <span>Availability bridge across local stores</span>
+                </div>
+                <span class="text-[9px] font-normal text-sky-700 bg-sky-100/90 px-1.5 py-0.5 rounded border border-sky-200">
+                  Simulation (2 of 620 Stores)
+                </span>
+              </div>
+              
+              <!-- Option 1: In-Store Substitute -->
+              ${substituteProduct && substituteProduct.in_stock ? `
+                <div class="flex items-center justify-between text-xs py-1 border-b border-sky-100">
+                  <div>
+                    <span class="text-slate-600 block text-[10px]">Same Store Alternative:</span>
+                    <strong class="text-slate-800 font-semibold">${substituteProduct.shortName}</strong>
+                    <span class="text-emerald-700 font-bold ml-1">₹${substituteProduct.price}</span>
+                  </div>
+                  <button onclick="acceptSmartSubstitution('${p.sku_id}', '${substituteProduct.sku_id}')" 
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-2.5 py-1 rounded shadow-2xs transition">
+                    + Add Alternative
+                  </button>
+                </div>
+              ` : `
+                <div class="text-[10px] text-slate-500 py-0.5">No alternative variant in stock at this store.</div>
+              `}
+
+              <!-- Option 2: Nearby Network Store -->
+              ${p.nearby_available ? `
+                <div class="flex items-center justify-between text-xs pt-1.5">
+                  <div>
+                    <span class="text-slate-600 block text-[10px]">Nearby NOVA partner store — 350m:</span>
+                    <strong class="text-slate-800 font-semibold">${p.shortName} (Sharma Daily Mart)</strong>
+                    <span class="text-emerald-700 text-[10px] font-medium"> — In Stock</span>
+                  </div>
+                  <button onclick="switchToNeighborStore('${p.sku_id}')" 
+                    class="bg-sky-600 hover:bg-sky-700 text-white font-bold text-[10px] px-2.5 py-1 rounded shadow-2xs transition">
+                    Switch Store
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">${p.icon}</span>
+              <div>
+                <h4 class="font-bold text-xs text-slate-900 ${isOOS ? 'line-through text-slate-400' : ''}">${p.name}</h4>
+                <span class="text-[11px] text-slate-500 font-mono">${p.unit} • ${p.category}</span>
+              </div>
+            </div>
+            ${statusBadge}
+          </div>
+
+          <div class="flex items-center justify-between mt-3">
+            <span class="font-extrabold text-sm text-slate-900">₹${p.price}</span>
+            ${!isOOS ? `
+              <button onclick="addToCart('${p.sku_id}')" class="bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-xs font-semibold px-3 py-1.5 rounded shadow-2xs transition">
+                + Add to Cart
+              </button>
+            ` : `
+              <button disabled class="bg-slate-200 text-slate-400 text-xs font-medium px-3 py-1.5 rounded cursor-not-allowed">
+                Unavailable
+              </button>
+            `}
+          </div>
+
+          ${smartBridgeHtml}
+        `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    // =========================================================================
+    // 7. SMART BRIDGE SUBSTITUTION INTERCEPT HANDLERS
+    // =========================================================================
+    function acceptSmartSubstitution(originalSkuId, substituteSkuId) {
+      const orig = products.find(p => p.sku_id === originalSkuId);
+      const sub = products.find(p => p.sku_id === substituteSkuId);
+      if (!sub) return;
+
+      // Add substitute to cart
+      addToCart(sub.sku_id);
+
+      // Increment Demo Telemetry
+      sessionMetrics.intercepted += 1;
+      sessionMetrics.gmvProtected += 486; // Case AOV benchmark
+      sessionMetrics.ticketsAvoided += 1;
+      updateMetricDisplays();
+
+      // Show summary bar
+      const summaryBar = document.getElementById('smart-bridge-summary-bar');
+      const summaryText = document.getElementById('smart-bridge-summary-text');
+      summaryText.innerText = `Substituted ${orig.shortName} with ${sub.shortName}. Potential cancellation avoided in this simulation.`;
+      summaryBar.classList.remove('hidden');
+
+      logAuditEvent(`[Smart-Bridge Simulation] Customer selected ${sub.shortName} in place of ${orig.shortName}. Simulated potential cancellation intercepted (+₹486 GMV protected based on case AOV).`);
+      showToast(`Smart Bridge: Added ${sub.shortName}! Alternative added to basket.`, "success");
+    }
+
+    function switchToNeighborStore(skuId) {
+      const p = products.find(prod => prod.sku_id === skuId);
+      const label = document.getElementById('current-browsing-store-label');
+      label.innerHTML = `Ordering from: <strong class="text-sky-800">Sharma Daily Mart</strong> (350m away • ~24 mins)`;
+
+      // Increment Demo Telemetry
+      sessionMetrics.intercepted += 1;
+      sessionMetrics.gmvProtected += 486;
+      sessionMetrics.ticketsAvoided += 1;
+      updateMetricDisplays();
+
+      logAuditEvent(`[Smart-Bridge Simulation] Availability bridge across local stores: routed to nearby partner store (Sharma Daily Mart — 350m) for ${p.shortName}. Simulated GMV protected (+₹486).`);
+      showToast(`Switched to Sharma Daily Mart (350m)! Item in stock.`, "info");
+      
+      // Auto-add to cart from neighbor store
+      addToCart(skuId);
+    }
+
+    // =========================================================================
+    // 8. CART & CHECKOUT LOGIC
+    // =========================================================================
+    function addToCart(skuId) {
+      const prod = products.find(p => p.sku_id === skuId);
+      if (!prod) return;
+
+      const existing = cart.find(c => c.sku_id === skuId);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        cart.push({ sku_id: skuId, count: 1 });
+      }
+
+      updateCartBadge();
+      renderCartModal();
+      showToast(`Added ${prod.shortName} to cart`, "info");
+    }
+
+    function updateCartBadge() {
+      const badge = document.getElementById('cart-count-badge');
+      const totalCount = cart.reduce((sum, item) => sum + item.count, 0);
+      badge.innerText = totalCount;
+    }
+
+    function toggleCartDrawer(show = true) {
+      const modal = document.getElementById('cart-modal');
+      if (show) {
+        renderCartModal();
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function renderCartModal() {
+      const container = document.getElementById('cart-items-container');
+      const subtotalEl = document.getElementById('cart-subtotal');
+      container.innerHTML = '';
+
+      if (cart.length === 0) {
+        container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">Your basket is empty.</div>`;
+        subtotalEl.innerText = '₹0';
+        return;
+      }
+
+      let subtotal = 0;
+      cart.forEach(item => {
+        const prod = products.find(p => p.sku_id === item.sku_id);
+        if (!prod) return;
+        const itemTotal = prod.price * item.count;
+        subtotal += itemTotal;
+
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-200 text-xs";
+        row.innerHTML = `
+          <div>
+            <strong class="text-slate-800">${prod.shortName}</strong>
+            <span class="text-slate-500 block text-[10px]">₹${prod.price} × ${item.count}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-slate-900">₹${itemTotal}</span>
+            <button onclick="removeFromCart('${prod.sku_id}')" class="text-rose-500 hover:text-rose-700 text-xs font-bold px-1.5 py-0.5 rounded">✕</button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+
+      subtotalEl.innerText = `₹${subtotal}`;
+    }
+
+    function removeFromCart(skuId) {
+      cart = cart.filter(c => c.sku_id !== skuId);
+      updateCartBadge();
+      renderCartModal();
+    }
+
+    function simulateCheckout() {
+      if (cart.length === 0) {
+        showToast("Cart is empty!", "warning");
+        return;
+      }
+      toggleCartDrawer(false);
+      logAuditEvent(`[Order Placed] Order checked out with ${cart.length} item(s). Potential cancellation avoided in this simulation.`);
+      showToast("Order Confirmed! Delivered in ~18 minutes.", "success");
+      cart = [];
+      updateCartBadge();
+    }
+
+    // =========================================================================
+    // 9. MERCHANT MINI INVENTORY TABLE
+    // =========================================================================
+    function renderMerchantTable() {
+      const tbody = document.getElementById('merchant-sku-table-body');
+      tbody.innerHTML = '';
+
+      products.forEach(p => {
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2 hover:bg-slate-50 transition";
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-base">${p.icon}</span>
+            <div>
+              <strong class="text-slate-800 block text-[11px]">${p.shortName}</strong>
+              <span class="text-slate-400 text-[10px] font-mono">₹${p.price} • ${p.category}</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded ${
+              p.in_stock ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+            }">
+              ${p.in_stock ? 'IN STOCK (' + p.qty + ')' : 'OUT OF STOCK'}
+            </span>
+            <button onclick="toggleSingleSku('${p.sku_id}')" title="Manual 1-Tap Toggle" 
+              class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-2 py-1 rounded">
+              Toggle
+            </button>
+          </div>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function toggleSingleSku(skuId) {
+      const prod = products.find(p => p.sku_id === skuId);
+      if (prod) {
+        prod.in_stock = !prod.in_stock;
+        prod.qty = prod.in_stock ? 10 : 0;
+        logAuditEvent(`[Manual Toggle] ${prod.shortName} switched to ${prod.in_stock ? 'IN_STOCK' : 'OUT_OF_STOCK'}`);
+        renderMerchantTable();
+        renderCustomerCatalog();
+        showToast(`${prod.shortName}: ${prod.in_stock ? 'In Stock' : 'Out of Stock'}`, "info");
+      }
+    }
+
+    // =========================================================================
+    // 10. BUSINESS IMPACT METRICS & AUDIT LOG
+    // =========================================================================
+    function updateMetricDisplays() {
+      document.getElementById('metric-intercepts').innerText = sessionMetrics.intercepted;
+      document.getElementById('metric-gmv').innerText = `₹${sessionMetrics.gmvProtected.toLocaleString('en-IN')}`;
+      document.getElementById('metric-tickets').innerText = sessionMetrics.ticketsAvoided;
+    }
+
+    function logAuditEvent(message) {
+      const logContainer = document.getElementById('session-audit-log');
+      const time = new Date().toLocaleTimeString('en-IN', { hour12: false });
+      const entry = document.createElement('div');
+      entry.className = "text-[11px] leading-tight text-slate-700";
+      entry.innerHTML = `<span class="text-slate-400 font-mono">[${time}]</span> ${message}`;
+      logContainer.prepend(entry);
+    }
+
+    // =========================================================================
+    // 11. VOICE INPUT VIA WEB SPEECH API
+    // =========================================================================
+    function setupSpeechRecognition() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        console.log("Speech recognition not supported in this browser.");
+        return;
+      }
+
+      speechRecognition = new SpeechRec();
+      speechRecognition.continuous = false;
+      speechRecognition.interimResults = false;
+      speechRecognition.lang = 'en-IN'; // Indian English / Hinglish
+
+      speechRecognition.onstart = () => {
+        isListening = true;
+        document.getElementById('mic-icon').classList.add('text-rose-600', 'pulse-mic');
+        showToast("Listening... speak your stock update now", "info");
+      };
+
+      speechRecognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('merchant-text-input').value = transcript;
+        showToast(`Captured: "${transcript}"`, "success");
+        processMerchantSync();
+      };
+
+      speechRecognition.onerror = (event) => {
+        console.warn("Speech error:", event.error);
+        showToast(`Mic error: ${event.error}`, "warning");
+        stopListening();
+      };
+
+      speechRecognition.onend = () => {
+        stopListening();
+      };
+    }
+
+    function toggleVoiceInput() {
+      if (!speechRecognition) {
+        showToast("Voice recognition not supported in this browser. Please type into the input box.", "warning");
+        return;
+      }
+      if (isListening) {
+        speechRecognition.stop();
+        stopListening();
+      } else {
+        try {
+          speechRecognition.start();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
+    function stopListening() {
+      isListening = false;
+      const micIcon = document.getElementById('mic-icon');
+      if (micIcon) {
+        micIcon.classList.remove('text-rose-600', 'pulse-mic');
+      }
+    }
+
+    // =========================================================================
+    // 12. FILTER & SEARCH
+    // =========================================================================
+    function setCategoryFilter(category) {
+      activeCategory = category;
+      document.querySelectorAll('.cat-pill').forEach(btn => {
+        if (btn.dataset.category === category) {
+          btn.className = "cat-pill active px-2 py-1 rounded bg-slate-800 text-white font-medium text-[11px]";
+        } else {
+          btn.className = "cat-pill px-2 py-1 rounded bg-slate-200 text-slate-700 font-medium text-[11px]";
+        }
+      });
+      renderCustomerCatalog();
+    }
+
+    function filterCustomerCatalog() {
+      searchQuery = document.getElementById('customer-search-input').value.toLowerCase().trim();
+      renderCustomerCatalog();
+    }
+
+    // =========================================================================
+    // 13. SETTINGS & RESET
+    // =========================================================================
+    function toggleConfigModal(show) {
+      const modal = document.getElementById('config-modal');
+      if (show) {
+        modal.classList.remove('hidden');
+        document.querySelector(`input[name="ai-mode"][value="${aiMode}"]`).checked = true;
+        document.getElementById('gemini-api-key').value = geminiApiKey;
+        document.getElementById('gemini-key-container').classList.toggle('hidden', aiMode !== 'gemini');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function handleModeChange(mode) {
+      document.getElementById('gemini-key-container').classList.toggle('hidden', mode !== 'gemini');
+    }
+
+    function saveConfig() {
+      const selectedMode = document.querySelector('input[name="ai-mode"]:checked').value;
+      const key = document.getElementById('gemini-api-key').value.trim();
+      aiMode = selectedMode;
+      geminiApiKey = key;
+      localStorage.setItem('nova_ai_mode', aiMode);
+      localStorage.setItem('nova_gemini_key', geminiApiKey);
+      updateModePill();
+      toggleConfigModal(false);
+      showToast(`Config saved: AI Mode set to ${aiMode.toUpperCase()}`, "success");
+    }
+
+    function updateModePill() {
+      const pill = document.getElementById('ai-mode-pill');
+      if (aiMode === 'gemini') {
+        pill.innerText = "AI: Gemini Flash";
+        pill.className = "text-[11px] font-mono text-sky-400 font-semibold";
+      } else {
+        pill.innerText = "AI: Local NLP";
+        pill.className = "text-[11px] font-mono text-emerald-400 font-semibold";
+      }
+    }
+
+    function resetDemoData() {
+      products = JSON.parse(JSON.stringify(INITIAL_PRODUCTS));
+      cart = [];
+      sessionMetrics = { intercepted: 0, gmvProtected: 0, ticketsAvoided: 0 };
+      document.getElementById('merchant-text-input').value = '';
+      document.getElementById('json-trace-output').innerText = "// Ready for demo reset...\n// Type or click 'Amul Gold doodh khatam ho gaya'";
+      document.getElementById('disambiguation-card').classList.add('hidden');
+      document.getElementById('smart-bridge-summary-bar').classList.add('hidden');
+      document.getElementById('current-browsing-store-label').innerHTML = `Ordering from: <strong class="text-slate-700">Gupta Kirana & General Store</strong> (Delivery: ~18 mins)`;
+      renderMerchantTable();
+      renderCustomerCatalog();
+      updateCartBadge();
+      updateMetricDisplays();
+      logAuditEvent("[Demo Reset] System reset to pristine case baseline. Ready for demonstration.");
+      showToast("Demo data successfully reset to baseline!", "info");
+    }
+
+    // =========================================================================
+    // 14. TOAST NOTIFICATION UTILITY
+    // =========================================================================
+    function showToast(message, type = "info") {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let colors = "bg-slate-900 text-white border-slate-700";
+      if (type === "success") colors = "bg-emerald-900 text-emerald-100 border-emerald-700";
+      if (type === "warning") colors = "bg-amber-900 text-amber-100 border-amber-700";
+
+      toast.className = `${colors} border px-3 py-2 rounded-lg text-xs shadow-lg transition-all transform duration-300 ease-out flex items-center justify-between gap-2 pointer-events-auto`;
+      toast.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()" class="text-xs opacity-70 hover:opacity-100 font-bold">✕</button>`;
+
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+  </script>
+</body>
+</html>
